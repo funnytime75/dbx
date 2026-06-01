@@ -48,6 +48,21 @@ export function useDataGridActions(activeTab: ComputedRef<QueryTab | undefined>)
     });
   }
 
+  async function executeDataTabSql(
+    tab: QueryTab,
+    options: { orderBy?: string; limit?: number; offset?: number; whereInput?: string } = {},
+  ) {
+    const limit = options.limit ?? settingsStore.editorSettings.pageSize;
+    const offset = options.offset ?? 0;
+    const sql = await buildTableSql(tab, { ...options, limit, offset });
+    queryStore.updateSql(tab.id, sql);
+    await queryStore.executeTabSql(tab.id, sql, {
+      resultBaseSql: sql,
+      resultSortedSql: undefined,
+      pagination: { limit, offset },
+    });
+  }
+
   async function onExecuteSql(sql: string) {
     const tab = activeTab.value;
     if (!tab) return;
@@ -67,8 +82,7 @@ export function useDataGridActions(activeTab: ComputedRef<QueryTab | undefined>)
     if (!tab) return;
     if (tab.mode === "data" && tab.tableMeta) {
       tab.whereInput = whereInput ?? "";
-      queryStore.updateSql(tab.id, await buildTableSql(tab, { whereInput, orderBy, limit, offset }));
-      await queryStore.executeCurrentTab();
+      await executeDataTabSql(tab, { whereInput, orderBy, limit, offset });
       return;
     }
     if (tab.resultSortedSql) {
@@ -109,9 +123,7 @@ export function useDataGridActions(activeTab: ComputedRef<QueryTab | undefined>)
 
     if (!tab.tableMeta) return;
     tab.whereInput = whereInput ?? "";
-    const sql = await buildTableSql(tab, { limit, offset, whereInput, orderBy });
-    queryStore.updateSql(tab.id, sql);
-    await queryStore.executeCurrentTab();
+    await executeDataTabSql(tab, { limit, offset, whereInput, orderBy });
   }
 
   async function onSort(column: string, columnIndex: number, direction: "asc" | "desc" | null, whereInput?: string) {
@@ -129,9 +141,7 @@ export function useDataGridActions(activeTab: ComputedRef<QueryTab | undefined>)
       const orderBy = direction
         ? `${config?.db_type === "neo4j" ? `n.${quotedColumn}` : quotedColumn} ${direction.toUpperCase()}`
         : undefined;
-      const sql = await buildTableSql(tab, { orderBy, whereInput });
-      queryStore.updateSql(tab.id, sql);
-      await queryStore.executeCurrentTab();
+      await executeDataTabSql(tab, { orderBy, whereInput, offset: 0 });
       return;
     }
 
