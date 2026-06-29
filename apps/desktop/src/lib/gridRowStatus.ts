@@ -24,6 +24,6 @@ export function canEditGridCellDetail(options: { canEditCell: boolean; isDraft: 
   return options.canEditCell && !options.isDraft;
 }
 
-export function canApplyGridSelectionValue(options: { isDraft: boolean }): boolean {
-  return !options.isDraft;
+export function canApplyGridSelectionValue(options: { isDraft: boolean; allowDraft?: boolean }): boolean {
+  return !options.isDraft || options.allowDraft === true;
 }

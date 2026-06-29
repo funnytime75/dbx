@@ -39,4 +39,5 @@ test("adding a row switches filters that would hide new rows back to all", () =>
 test("selection value fill skips quick entry draft rows", () => {
   assert.equal(canApplyGridSelectionValue({ isDraft: false }), true);
   assert.equal(canApplyGridSelectionValue({ isDraft: true }), false);
+  assert.equal(canApplyGridSelectionValue({ isDraft: true, allowDraft: true }), true);
 });
