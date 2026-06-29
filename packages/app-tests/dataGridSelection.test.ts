@@ -50,6 +50,36 @@ function mouseEvent(options: Partial<MouseEvent> = {}): MouseEvent {
   } as MouseEvent;
 }
 
+function createSelectionWithDraftRow() {
+  return useDataGridSelection({
+    columns: computed(() => ["id", "name"]),
+    displayItems: computed(() => [
+      {
+        id: 0,
+        sourceIndex: 0,
+        data: [1, "Ada"],
+        isNew: false,
+        isDeleted: false,
+        isDirtyCol: [false, false],
+        status: "clean",
+      },
+      {
+        id: Number.MIN_SAFE_INTEGER,
+        data: [null, null],
+        isNew: false,
+        isDraft: true,
+        isDeleted: false,
+        isDirtyCol: [false, false],
+        status: "draft",
+      },
+    ]),
+    editingCell: ref(null),
+    showTranspose: ref(false),
+    transposeRowIndex: ref(null),
+    gridRef: ref(undefined),
+  });
+}
+
 test("cell selection does not read row data before a range exists", () => {
   let displayItemsReads = 0;
   const selection = useDataGridSelection({
@@ -76,6 +106,30 @@ test("cell selection does not read row data before a range exists", () => {
 
   assert.equal(selection.hasCellSelection.value, false);
   assert.equal(displayItemsReads, 0);
+});
+
+test("all-cell selection excludes the quick entry draft row from selected data", () => {
+  const selection = createSelectionWithDraftRow();
+
+  selection.selectAllCells();
+
+  assert.deepEqual(selection.selectedCells.value, {
+    columns: ["id", "name"],
+    rows: [[1, "Ada"]],
+  });
+  assert.equal(selection.selectedCellCount.value, 2);
+});
+
+test("column selection excludes the quick entry draft row from selected data", () => {
+  const selection = createSelectionWithDraftRow();
+
+  selection.selectColumn(1);
+
+  assert.deepEqual(selection.selectedCells.value, {
+    columns: ["name"],
+    rows: [["Ada"]],
+  });
+  assert.equal(selection.selectedCellCount.value, 1);
 });
 
 test("ctrl clicking cells toggles only the clicked cells", () => {
