@@ -3016,6 +3016,7 @@ const {
   useTransaction,
   exitTransaction,
   startEdit,
+  commitEdit,
   commitEditAndMaybeAutoSave,
   commitEditFromBlur,
   applyCellValue,
