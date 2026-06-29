@@ -95,7 +95,7 @@ export function clearFitCanvasTextCache(): void {
   fitCanvasTextCache.clear();
 }
 
-function fitCanvasText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
+export function fitCanvasText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
   if (maxWidth <= 0) return "";
   const font = ctx.font;
   const cacheKey = `${font}|${text}|${maxWidth}`;
