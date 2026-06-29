@@ -105,7 +105,7 @@ import {
   transposeScrollLeftForRecord,
   visibleTransposeRecordWindow,
 } from "@/lib/dataGridTranspose";
-import { canDeleteGridRowItem, canEditGridCellDetail, matchesRowStatusFilter, shouldShowQuickEntryDraftRow, type RowStatus, type RowStatusFilter } from "@/lib/gridRowStatus";
+import { canApplyGridSelectionValue, canDeleteGridRowItem, canEditGridCellDetail, matchesRowStatusFilter, shouldShowQuickEntryDraftRow, type RowStatus, type RowStatusFilter } from "@/lib/gridRowStatus";
 import { displayCellValue, type CellValue } from "@/lib/cellValue";
 import { getApplicablePreviewActions } from "@/lib/resultPreviewRegistry";
 import "@/lib/previewHandlers/geometryMapPreview";
@@ -5432,6 +5432,11 @@ function applyVisibleCellValue(item: RowItem, visibleCol: number, value: string 
   return true;
 }
 
+function applyVisibleSelectedCellValue(item: RowItem, visibleCol: number, value: string | null): boolean {
+  if (!canApplyGridSelectionValue({ isDraft: !!item.isDraft })) return false;
+  return applyVisibleCellValue(item, visibleCol, value);
+}
+
 function fillSelectionWithValue(value: string | null): boolean {
   const range = selectedRange.value;
   let applied = false;
@@ -5440,7 +5445,7 @@ function fillSelectionWithValue(value: string | null): boolean {
       const item = displayItemAt(rowIndex);
       if (!item) continue;
       for (let visibleCol = range.startCol; visibleCol <= range.endCol; visibleCol++) {
-        applied = applyVisibleCellValue(item, visibleCol, value) || applied;
+        applied = applyVisibleSelectedCellValue(item, visibleCol, value) || applied;
       }
     }
     return applied;
@@ -5453,7 +5458,7 @@ function fillSelectionWithValue(value: string | null): boolean {
     const item = displayItemAt(rowIndex);
     if (!item) continue;
     for (const visibleCol of visibleColumnIndexes) {
-      applied = applyVisibleCellValue(item, visibleCol, value) || applied;
+      applied = applyVisibleSelectedCellValue(item, visibleCol, value) || applied;
     }
   }
   return applied;

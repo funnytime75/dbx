@@ -23,3 +23,7 @@ export function canDeleteGridRowItem(options: { editable: boolean; isDraft: bool
 export function canEditGridCellDetail(options: { canEditCell: boolean; isDraft: boolean }): boolean {
   return options.canEditCell && !options.isDraft;
 }
+
+export function canApplyGridSelectionValue(options: { isDraft: boolean }): boolean {
+  return !options.isDraft;
+}
