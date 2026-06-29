@@ -5515,11 +5515,12 @@ function cutSelection() {
   if (!props.editable || !selectedRange.value) return;
   copySelectionTsv();
   const range = selectedRange.value;
+  const allowDraftSelectionValue = selectedRangeTargetsOnlyDraftRow();
   for (let rowIndex = range.startRow; rowIndex <= range.endRow; rowIndex++) {
     const item = displayItemAt(rowIndex);
     if (!item) continue;
     for (let visibleCol = range.startCol; visibleCol <= range.endCol; visibleCol++) {
-      applyCellValue(item.id, actualColumnIndex(visibleCol), null);
+      applyVisibleSelectedCellValue(item, visibleCol, null, allowDraftSelectionValue);
     }
   }
 }
