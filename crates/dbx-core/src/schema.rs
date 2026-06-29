@@ -816,6 +816,25 @@ pub async fn list_tables_core(
     .await
 }
 
+/// List vector database collections, returning structured info (name, id, dimension).
+/// Only works for PoolKind::VectorDb connections; returns an error for other types.
+pub async fn list_vector_collections_core(
+    state: &AppState,
+    connection_id: &str,
+    database: &str,
+) -> Result<Vec<db::vector_driver::CollectionInfo>, String> {
+    let pool_key =
+        state.get_or_create_pool(connection_id, if database.is_empty() { None } else { Some(database) }).await?;
+    let client = {
+        let connections = state.connections.read().await;
+        match connections.get(&pool_key) {
+            Some(PoolKind::VectorDb(client)) => client.clone(),
+            _ => return Err("Not a vector database connection".to_string()),
+        }
+    };
+    db::vector_driver::list_collections_with_db(&client, database).await
+}
+
 pub async fn get_table_comment_core(
     state: &AppState,
     connection_id: &str,

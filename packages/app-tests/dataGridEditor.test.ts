@@ -524,6 +524,104 @@ test("saving edited rows without deletes does not reload table data", async () =
   assert.deepEqual(emitted, []);
 });
 
+test("undo and redo restore pending cell edits before save", () => {
+  setActivePinia(createPinia());
+  installBrowserTestGlobals();
+
+  const result = computed(() => ({
+    columns: ["id", "name"],
+    rows: [[1, "Ada"] as CellValue[]],
+  }));
+  const editor = createPeopleGridEditor(result);
+
+  editor.applyCellValue(0, 1, "Ada Lovelace");
+  assert.equal(editor.canUndoPendingChange.value, true);
+  assert.equal(editor.canRedoPendingChange.value, false);
+  assert.deepEqual(editor.rowDataWithChanges(result.value.rows[0], 0), [1, "Ada Lovelace"]);
+
+  editor.undoPendingChange();
+  assert.equal(editor.canUndoPendingChange.value, false);
+  assert.equal(editor.canRedoPendingChange.value, true);
+  assert.equal(editor.dirtyRows.value.size, 0);
+  assert.deepEqual(editor.rowDataWithChanges(result.value.rows[0], 0), [1, "Ada"]);
+
+  editor.redoPendingChange();
+  assert.equal(editor.canUndoPendingChange.value, true);
+  assert.equal(editor.canRedoPendingChange.value, false);
+  assert.deepEqual(editor.rowDataWithChanges(result.value.rows[0], 0), [1, "Ada Lovelace"]);
+});
+
+test("restoring a pending cell edit records undo and redo history", () => {
+  setActivePinia(createPinia());
+  installBrowserTestGlobals();
+
+  const result = computed(() => ({
+    columns: ["id", "name"],
+    rows: [[1, "Ada"] as CellValue[]],
+  }));
+  const editor = createPeopleGridEditor(result);
+
+  editor.applyCellValue(0, 1, "Ada Lovelace");
+  editor.restoreCellValue(0, 1);
+  assert.equal(editor.canUndoPendingChange.value, true);
+  assert.equal(editor.canRedoPendingChange.value, false);
+  assert.equal(editor.dirtyRows.value.size, 0);
+  assert.deepEqual(editor.rowDataWithChanges(result.value.rows[0], 0), [1, "Ada"]);
+
+  editor.undoPendingChange();
+  assert.equal(editor.canUndoPendingChange.value, true);
+  assert.equal(editor.canRedoPendingChange.value, true);
+  assert.deepEqual(editor.rowDataWithChanges(result.value.rows[0], 0), [1, "Ada Lovelace"]);
+
+  editor.redoPendingChange();
+  assert.equal(editor.canUndoPendingChange.value, true);
+  assert.equal(editor.canRedoPendingChange.value, false);
+  assert.equal(editor.dirtyRows.value.size, 0);
+  assert.deepEqual(editor.rowDataWithChanges(result.value.rows[0], 0), [1, "Ada"]);
+});
+
+test("undo and redo cover row add and delete operations", () => {
+  setActivePinia(createPinia());
+  installBrowserTestGlobals();
+
+  const editor = createPeopleGridEditor();
+
+  editor.addRow();
+  assert.equal(editor.newRows.value.length, 1);
+  editor.undoPendingChange();
+  assert.equal(editor.newRows.value.length, 0);
+  editor.redoPendingChange();
+  assert.equal(editor.newRows.value.length, 1);
+
+  editor.applyDeleteRow(0);
+  assert.deepEqual([...editor.deletedRows.value], [0]);
+  editor.undoPendingChange();
+  assert.deepEqual([...editor.deletedRows.value], []);
+  assert.equal(editor.newRows.value.length, 1);
+  editor.redoPendingChange();
+  assert.deepEqual([...editor.deletedRows.value], [0]);
+});
+
+test("keeps appended empty-table rows when parent refreshes an equivalent rows array", async () => {
+  setActivePinia(createPinia());
+  installBrowserTestGlobals();
+
+  const result = ref<{ columns: string[]; rows: CellValue[][] }>({ columns: ["id", "name"], rows: [] });
+  const editor = createPeopleGridEditor(computed(() => result.value));
+
+  editor.addRow();
+  await nextTick();
+  assert.equal(editor.newRows.value.length, 1);
+
+  result.value = { columns: ["id", "name"], rows: [] };
+  await nextTick();
+  assert.equal(editor.newRows.value.length, 1);
+
+  result.value = { columns: ["id", "name"], rows: [[1, "Ada"] as CellValue[]] };
+  await nextTick();
+  assert.equal(editor.newRows.value.length, 0);
+});
+
 test("saving manually typed JSON from a MySQL grid normalizes smart quotes", async () => {
   setActivePinia(createPinia());
   installBrowserTestGlobals();
