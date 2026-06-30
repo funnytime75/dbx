@@ -35,6 +35,7 @@ import {
   buildSimpleObjectTreeNodes,
   buildTableTreeNodes,
   expandCachedObjectBrowserNodes,
+  filterSimpleSidebarSupplementalObjects,
   mergeTableInfosIntoObjects,
   mergeTableTreePageChildren,
   objectGroupRefreshParentId,
@@ -55,6 +56,8 @@ import { inferMongoCompletionFields, type MongoCompletionField } from "@/lib/mon
 import { completionSchemasFromTree, completionTablesFromTree } from "@/lib/completionTreeIndex";
 import { kvRootNodeLabel } from "@/lib/kvRootPresentation";
 import { REDIS_SCAN_PAGE_SIZE_DEFAULT } from "@/lib/redisKeyPattern";
+import { appendAgentDriverUpdateHint, hasAgentDriverUpdate, type AgentDriverInstallState } from "@/lib/agentDriverInstallHint";
+import i18n from "@/i18n";
 
 const PINNED_TREE_NODES_STORAGE_KEY = "dbx-pinned-tree-nodes";
 const ACTIVE_CONNECTION_STORAGE_KEY = "dbx-active-connection";
@@ -167,6 +170,8 @@ export const useConnectionStore = defineStore("connection", () => {
   const pinnedTreeNodeIds = ref<Set<string>>(new Set());
   const connectedIds = ref<Set<string>>(new Set());
   const lastConnectionHealthCheckAt = ref<Record<string, number>>({});
+  const agentDrivers = ref<AgentDriverInstallState[]>([]);
+  let agentDriversRefreshPromise: Promise<void> | null = null;
   const loadedTreeNodeChildrenIds = ref<Set<string>>(new Set());
   const connectionErrors = ref<Record<string, string>>({});
   const editingConnectionId = ref<string | null>(null);
@@ -276,6 +281,44 @@ export const useConnectionStore = defineStore("connection", () => {
     connectionErrors.value[connectionId] = message;
   }
 
+  function agentDriverUpdateHint(): string {
+    return i18n.global.t("connection.agentDriverUpdateConnectionHint");
+  }
+
+  function connectionErrorWithDriverUpdateHint(config: ConnectionConfig | undefined, message: string): string {
+    if (!config) return message;
+    if (!hasAgentDriverUpdate(config.db_type, agentDrivers.value, config.driver_profile)) return message;
+    return appendAgentDriverUpdateHint(message, agentDriverUpdateHint());
+  }
+
+  function refreshAgentDriversForErrorHint(): Promise<void> {
+    if (agentDriversRefreshPromise) return agentDriversRefreshPromise;
+    agentDriversRefreshPromise = api
+      .listInstalledAgents()
+      .then((drivers) => {
+        agentDrivers.value = drivers;
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        agentDriversRefreshPromise = null;
+      });
+    return agentDriversRefreshPromise;
+  }
+
+  function maybeAppendAgentDriverUpdateHint(connectionId: string, baseMessage: string) {
+    const config = getConfig(connectionId);
+    const message = connectionErrorWithDriverUpdateHint(config, baseMessage);
+    if (message !== baseMessage) {
+      setConnectionError(connectionId, message);
+      return;
+    }
+    void refreshAgentDriversForErrorHint().then(() => {
+      if (connectionErrors.value[connectionId] !== baseMessage) return;
+      const refreshedMessage = connectionErrorWithDriverUpdateHint(config, baseMessage);
+      if (refreshedMessage !== baseMessage) setConnectionError(connectionId, refreshedMessage);
+    });
+  }
+
   function clearConnectionError(connectionId: string) {
     if (!connectionErrors.value[connectionId]) return;
     delete connectionErrors.value[connectionId];
@@ -368,6 +411,7 @@ export const useConnectionStore = defineStore("connection", () => {
   function recordConnectionError(connectionId: string, error: unknown): string {
     const message = connectionErrorMessage(error);
     setConnectionError(connectionId, message);
+    maybeAppendAgentDriverUpdateHint(connectionId, message);
     return message;
   }
 
@@ -770,7 +814,7 @@ export const useConnectionStore = defineStore("connection", () => {
           connectionId: options.connectionId,
           database: options.database,
           schema: options.effectiveSchema,
-          objects: mergeTableInfosIntoObjects(objects, pageTables, options.effectiveSchema),
+          objects: mergeTableInfosIntoObjects(filterSimpleSidebarSupplementalObjects(objects), pageTables, options.effectiveSchema),
         });
         return {
           children,
@@ -1707,10 +1751,12 @@ export const useConnectionStore = defineStore("connection", () => {
     const node = findNode(treeNodes.value, connectionId);
     if (!node) return;
 
+    const config = getConfig(connectionId);
+    const database = config?.database || "default";
     node.isLoading = true;
     try {
       await ensureConnected(connectionId);
-      const collections = await withMetadataLoadTimeout(connectionId, api.vectorListCollections(connectionId), "vector collections");
+      const collections = await withMetadataLoadTimeout(connectionId, api.vectorListCollections(connectionId, database), "vector collections");
       const sorted = [...collections].sort((a, b) => a.name.localeCompare(b.name));
       setChildren(
         node,
@@ -1721,7 +1767,7 @@ export const useConnectionStore = defineStore("connection", () => {
             label: info.name,
             type: "vector-collection" as const,
             connectionId,
-            database: "default",
+            database,
             isExpanded: false,
             meta: info.dimension != null ? { dimension: info.dimension } : undefined,
           })),
