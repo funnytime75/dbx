@@ -581,6 +581,7 @@ test("saving edited rows without deletes does not reload table data", async () =
   await editor.saveChanges();
 
   assert.deepEqual(emitted, []);
+  assert.deepEqual(result.value.rows[0], [1, "Ada Lovelace"]);
 });
 
 test("undo and redo restore pending cell edits before save", () => {

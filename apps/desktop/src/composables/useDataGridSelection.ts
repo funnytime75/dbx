@@ -76,7 +76,7 @@ export function useDataGridSelection(options: UseDataGridSelectionOptions) {
     });
   });
 
-  const selectedCellCount = computed(() => (selectedCellKeys.value.size > 0 ? selectedCellKeys.value.size : selectedCells.value.columns.length * selectedCells.value.rows.length));
+  const selectedCellCount = computed(() => selectedCells.value.rows.reduce((count, row) => count + row.length, 0));
   const hasCellSelection = computed(() => selectedCellCount.value > 0);
 
   function clearCellSelection() {

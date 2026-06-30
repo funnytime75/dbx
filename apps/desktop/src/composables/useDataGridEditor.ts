@@ -991,6 +991,17 @@ export function useDataGridEditor(options: UseDataGridEditorOptions) {
     return snapshot.newRows.length > 0 || snapshot.dirtyRows.size > 0 || snapshot.deletedRows.size > 0;
   }
 
+  function applyDirtyRowsToResult(snapshot: PendingSaveSnapshot) {
+    for (const [sourceIndex, changes] of snapshot.dirtyRows) {
+      const row = result.value.rows[sourceIndex];
+      if (row) {
+        for (const [colIdx, value] of changes) {
+          row[colIdx] = value;
+        }
+      }
+    }
+  }
+
   function clearSavedPendingChanges(snapshot: PendingSaveSnapshot) {
     for (const [sourceIndex, changes] of snapshot.dirtyRows) {
       const liveChanges = dirtyRows.value.get(sourceIndex);
@@ -1146,6 +1157,7 @@ export function useDataGridEditor(options: UseDataGridEditorOptions) {
         return;
       }
       snapshot.newRowRefs.forEach((row) => savingNewRows.delete(row));
+      applyDirtyRowsToResult(snapshot);
       clearSavedPendingChanges(snapshot);
       if (!hasPendingChanges.value) exitTransaction();
       clearPendingChangeHistory();
@@ -1220,14 +1232,7 @@ export function useDataGridEditor(options: UseDataGridEditorOptions) {
     } catch (e) {
       console.warn("[DBX] failed to record data grid history", e);
     }
-    for (const [sourceIndex, changes] of snapshot.dirtyRows) {
-      const row = result.value.rows[sourceIndex];
-      if (row) {
-        for (const [colIdx, value] of changes) {
-          row[colIdx] = value;
-        }
-      }
-    }
+    applyDirtyRowsToResult(snapshot);
     snapshot.newRowRefs.forEach((row) => savingNewRows.delete(row));
     clearSavedPendingChanges(snapshot);
     if (!hasPendingChanges.value) exitTransaction();

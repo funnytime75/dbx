@@ -132,6 +132,33 @@ test("column selection excludes the quick entry draft row from selected data", (
   assert.equal(selection.selectedCellCount.value, 1);
 });
 
+test("discrete draft cell selection is excluded from selected cell count", () => {
+  const selection = createSelectionWithDraftRow();
+
+  selection.selectSingleCell(1, 0);
+  selection.handleDataCellMousedown(1, 1, Number.MIN_SAFE_INTEGER, mouseEvent({ ctrlKey: true }));
+
+  assert.deepEqual(selection.selectedCells.value, {
+    columns: [],
+    rows: [],
+  });
+  assert.equal(selection.selectedCellCount.value, 0);
+  assert.equal(selection.hasCellSelection.value, false);
+});
+
+test("mixed discrete cell selection counts only real data cells", () => {
+  const selection = createSelectionWithDraftRow();
+
+  selection.selectSingleCell(0, 0);
+  selection.handleDataCellMousedown(1, 1, Number.MIN_SAFE_INTEGER, mouseEvent({ ctrlKey: true }));
+
+  assert.deepEqual(selection.selectedCells.value, {
+    columns: ["id"],
+    rows: [[1]],
+  });
+  assert.equal(selection.selectedCellCount.value, 1);
+});
+
 test("ctrl clicking cells toggles only the clicked cells", () => {
   const selection = createSelection();
 
