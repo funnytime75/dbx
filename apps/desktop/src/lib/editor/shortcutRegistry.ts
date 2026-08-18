@@ -36,6 +36,8 @@ export type ShortcutActionId =
   | "closeOtherTabs"
   | "focusSearch"
   | "quickOpen"
+  | "navigateTabHistoryBack"
+  | "navigateTabHistoryForward"
   | "switchToPreviousTab"
   | "switchToNextTab"
   | "switchToTab1"
@@ -87,7 +89,17 @@ export function closeOtherTabsDefaultShortcut(platform = globalThis.navigator?.p
   return isMacShortcutPlatform(platform) ? "Alt+Mod+W" : "Shift+Alt+W";
 }
 
-const CLOSE_OTHER_TABS_PLATFORM_DEFAULTS = new Set(["Alt+Mod+W", "Shift+Alt+W"]);
+export function tabNavigationHistoryDefaultShortcut(direction: "back" | "forward", platform = globalThis.navigator?.platform || ""): string {
+  const modifier = isMacShortcutPlatform(platform) ? "Ctrl" : "Mod";
+  const key = direction === "back" ? "ArrowLeft" : "ArrowRight";
+  return `${modifier}+Alt+${key}`;
+}
+
+const PLATFORM_DEFAULT_SHORTCUTS: Partial<Record<ShortcutActionId, ReadonlySet<string>>> = {
+  closeOtherTabs: new Set(["Alt+Mod+W", "Shift+Alt+W"]),
+  navigateTabHistoryBack: new Set(["Ctrl+Alt+ArrowLeft", "Mod+Alt+ArrowLeft"]),
+  navigateTabHistoryForward: new Set(["Ctrl+Alt+ArrowRight", "Mod+Alt+ArrowRight"]),
+};
 const LEGACY_CLOSE_TAB_DEFAULT = "Meta+W";
 
 export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
@@ -302,6 +314,18 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     defaultShortcut: "Mod+P",
   },
   {
+    id: "navigateTabHistoryBack",
+    labelKey: "settings.shortcutNavigateTabHistoryBack",
+    scope: "global",
+    defaultShortcut: tabNavigationHistoryDefaultShortcut("back"),
+  },
+  {
+    id: "navigateTabHistoryForward",
+    labelKey: "settings.shortcutNavigateTabHistoryForward",
+    scope: "global",
+    defaultShortcut: tabNavigationHistoryDefaultShortcut("forward"),
+  },
+  {
     id: "switchToPreviousTab",
     labelKey: "settings.shortcutSwitchToPreviousTab",
     scope: "global",
@@ -481,10 +505,10 @@ export function normalizeShortcutSettings(settings?: Partial<ShortcutSettings>):
     SHORTCUT_DEFINITIONS.map((definition) => {
       const configuredValue = settings?.[definition.id];
       let configured = typeof configuredValue === "string" ? configuredValue : definition.defaultShortcut;
-      // 云同步会把另一平台的默认值当作显式配置带过来（macOS 的 Alt+Mod+W 到
-      // Windows 上会还原成 Ctrl+Alt+W）。凡是平台默认集合内的值都视为"未
-      // 自定义"，按本机平台重新解析；用户真正自定义的其他组合原样保留
-      if (definition.id === "closeOtherTabs" && CLOSE_OTHER_TABS_PLATFORM_DEFAULTS.has(configured)) {
+      // 云同步会把另一平台的默认值当作显式配置带过来。平台默认集合内的值视为
+      // 未自定义，按本机平台重新解析；用户真正自定义的其他组合原样保留
+      const platformDefaults = PLATFORM_DEFAULT_SHORTCUTS[definition.id];
+      if (platformDefaults?.has(configured)) {
         configured = definition.defaultShortcut;
       }
       // Meta+W was the old macOS-only default. Treat that exact value as a

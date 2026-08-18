@@ -231,6 +231,14 @@ export function isQuickOpenShortcut(event: ShortcutLikeEvent, shortcuts?: Partia
   return matchesShortcut(event, actionShortcut("quickOpen", shortcuts));
 }
 
+export function isNavigateTabHistoryBackShortcut(event: ShortcutLikeEvent, shortcuts?: Partial<ShortcutSettings>): boolean {
+  return matchesShortcut(event, actionShortcut("navigateTabHistoryBack", shortcuts));
+}
+
+export function isNavigateTabHistoryForwardShortcut(event: ShortcutLikeEvent, shortcuts?: Partial<ShortcutSettings>): boolean {
+  return matchesShortcut(event, actionShortcut("navigateTabHistoryForward", shortcuts));
+}
+
 export function isSwitchToPreviousTabShortcut(event: ShortcutLikeEvent, shortcuts?: Partial<ShortcutSettings>): boolean {
   return matchesShortcut(event, actionShortcut("switchToPreviousTab", shortcuts));
 }

@@ -7,6 +7,7 @@ import { DEFAULT_TABLE_COLUMN_TEMPLATE_FIELDS } from "../../apps/desktop/src/lib
 import { DEFAULT_DATA_GRID_FONT_FAMILY, DEFAULT_UI_FONT_FAMILY, SYSTEM_UI_FONT_FAMILY } from "../../apps/desktop/src/lib/app/appFonts.ts";
 import { tableOpenPageLimit } from "../../apps/desktop/src/lib/table/tableOpenPageLimit.ts";
 import { AI_PROVIDER_PRESETS, DEFAULT_EDITOR_SETTINGS, EXECUTE_MODE_CURRENT_DEFAULT_VERSION, normalizeAiConfig, normalizeEditorSettings, useSettingsStore } from "../../apps/desktop/src/stores/settingsStore.ts";
+import { tabNavigationHistoryDefaultShortcut } from "../../apps/desktop/src/lib/editor/shortcutRegistry.ts";
 
 const saveEditorSettingsMock = vi.hoisted(() => vi.fn());
 vi.mock("../../apps/desktop/src/lib/backend/api", async (importOriginal) => {
@@ -384,6 +385,8 @@ test("defaults shortcut settings", () => {
   assert.equal(settings.shortcuts.newQuery, "Mod+T");
   assert.equal(settings.shortcuts.openSettings, "Mod+,");
   assert.equal(settings.shortcuts.focusSearch, "Mod+F");
+  assert.equal(settings.shortcuts.navigateTabHistoryBack, tabNavigationHistoryDefaultShortcut("back"));
+  assert.equal(settings.shortcuts.navigateTabHistoryForward, tabNavigationHistoryDefaultShortcut("forward"));
   assert.equal(settings.shortcuts.zoomInUi, "Mod+=");
   assert.equal(settings.shortcuts.zoomOutUi, "Mod+-");
   assert.equal(settings.shortcuts.resetUiZoom, "Mod+0");
