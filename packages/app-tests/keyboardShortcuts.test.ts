@@ -30,7 +30,7 @@ import {
   matchesShortcut,
   switchToTabIndexFromShortcut,
 } from "../../apps/desktop/src/lib/editor/keyboardShortcuts.ts";
-import { DEFAULT_SHORTCUT_SETTINGS, findShortcutConflict, normalizeShortcutSettings, shortcutToCodeMirrorKey, tabNavigationHistoryDefaultShortcut } from "../../apps/desktop/src/lib/editor/shortcutRegistry.ts";
+import { DEFAULT_SHORTCUT_SETTINGS, findShortcutConflict, needsTabNavigationHistoryShortcutMigration, normalizeShortcutSettings, shortcutToCodeMirrorKey, tabNavigationHistoryDefaultShortcut } from "../../apps/desktop/src/lib/editor/shortcutRegistry.ts";
 
 beforeAll(() => vi.stubGlobal("navigator", { platform: "Linux x86_64" }));
 afterAll(() => vi.unstubAllGlobals());
@@ -84,14 +84,14 @@ test("matches Shift+Mod+brackets for switching adjacent tabs", () => {
   assert.equal(isSwitchToNextTabShortcut({ key: "]", metaKey: true }), false);
 });
 
-test("使用 Ctrl+Alt+方向键前进或后退标签访问历史", () => {
+test("navigates backward and forward through tab visit history with Ctrl+Alt+Arrow keys", () => {
   assert.equal(isNavigateTabHistoryBackShortcut({ key: "ArrowLeft", ctrlKey: true, altKey: true }), true);
   assert.equal(isNavigateTabHistoryForwardShortcut({ key: "ArrowRight", ctrlKey: true, altKey: true }), true);
   assert.equal(isNavigateTabHistoryBackShortcut({ key: "ArrowLeft", ctrlKey: true }), false);
   assert.equal(isNavigateTabHistoryForwardShortcut({ key: "ArrowRight", altKey: true }), false);
 });
 
-test("标签历史默认快捷键与各平台录制格式一致", () => {
+test("matches tab history defaults to the recorded shortcut format on each platform", () => {
   const backEvent = { key: "ArrowLeft", ctrlKey: true, altKey: true };
   const forwardEvent = { key: "ArrowRight", ctrlKey: true, altKey: true };
 
@@ -105,7 +105,7 @@ test("标签历史默认快捷键与各平台录制格式一致", () => {
   assert.equal(eventToShortcut(forwardEvent, "MacIntel"), tabNavigationHistoryDefaultShortcut("forward", "MacIntel"));
 });
 
-test("Windows 上录制相同标签历史快捷键时报告冲突", () => {
+test("reports conflicts for recorded tab history shortcuts on Windows", () => {
   const backShortcut = eventToShortcut({ key: "ArrowLeft", ctrlKey: true, altKey: true }, "Win32")!;
   const forwardShortcut = eventToShortcut({ key: "ArrowRight", ctrlKey: true, altKey: true }, "Win32")!;
   const backSettings = { ...DEFAULT_SHORTCUT_SETTINGS, navigateTabHistoryBack: backShortcut, quickOpen: backShortcut };
@@ -115,7 +115,7 @@ test("Windows 上录制相同标签历史快捷键时报告冲突", () => {
   assert.equal(findShortcutConflict("quickOpen", forwardShortcut, forwardSettings), "navigateTabHistoryForward");
 });
 
-test("跨平台同步时恢复本机的标签历史默认格式", () => {
+test("restores the local tab history default format after cross-platform sync", () => {
   const currentBackDefault = tabNavigationHistoryDefaultShortcut("back");
   const currentForwardDefault = tabNavigationHistoryDefaultShortcut("forward");
   const otherBackDefault = currentBackDefault.startsWith("Mod+") ? "Ctrl+Alt+ArrowLeft" : "Mod+Alt+ArrowLeft";
@@ -127,6 +127,44 @@ test("跨平台同步时恢复本机的标签历史默认格式", () => {
 
   assert.equal(normalized.navigateTabHistoryBack, currentBackDefault);
   assert.equal(normalized.navigateTabHistoryForward, currentForwardDefault);
+});
+
+test("preserves existing actions and unbinds new history actions when defaults conflict", () => {
+  const normalized = normalizeShortcutSettings({
+    switchToPreviousTab: "Ctrl+Alt+ArrowLeft",
+    switchToNextTab: "Mod+Alt+ArrowRight",
+  });
+
+  assert.equal(normalized.switchToPreviousTab, "Ctrl+Alt+ArrowLeft");
+  assert.equal(normalized.switchToNextTab, "Mod+Alt+ArrowRight");
+  assert.equal(normalized.navigateTabHistoryBack, "");
+  assert.equal(normalized.navigateTabHistoryForward, "");
+});
+
+test("requests tab history migration only when legacy shortcut settings exist", () => {
+  assert.equal(needsTabNavigationHistoryShortcutMigration(), false);
+  assert.equal(needsTabNavigationHistoryShortcutMigration({}), true);
+});
+
+test("adds default bindings for new history actions when legacy shortcuts do not conflict", () => {
+  const normalized = normalizeShortcutSettings({
+    switchToPreviousTab: "Shift+Mod+[",
+    switchToNextTab: "Shift+Mod+]",
+  });
+
+  assert.equal(normalized.navigateTabHistoryBack, tabNavigationHistoryDefaultShortcut("back"));
+  assert.equal(normalized.navigateTabHistoryForward, tabNavigationHistoryDefaultShortcut("forward"));
+});
+
+test("preserves explicitly configured tab history shortcuts during migration", () => {
+  const backShortcut = tabNavigationHistoryDefaultShortcut("back");
+  const normalized = normalizeShortcutSettings({
+    navigateTabHistoryBack: backShortcut,
+    switchToPreviousTab: backShortcut,
+  });
+
+  assert.equal(normalized.navigateTabHistoryBack, backShortcut);
+  assert.equal(normalized.switchToPreviousTab, backShortcut);
 });
 
 test("matches Mod+number for switching to numbered tabs", () => {

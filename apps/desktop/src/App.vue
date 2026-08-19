@@ -2295,16 +2295,14 @@ async function handleKeydown(e: KeyboardEvent) {
     }
     return;
   }
-  if (isNavigateTabHistoryBackShortcut(e, shortcuts)) {
+  if (isNavigateTabHistoryBackShortcut(e, shortcuts) && activateTabFromHistory(-1)) {
     e.preventDefault();
     e.stopPropagation();
-    activateTabFromHistory(-1);
     return;
   }
-  if (isNavigateTabHistoryForwardShortcut(e, shortcuts)) {
+  if (isNavigateTabHistoryForwardShortcut(e, shortcuts) && activateTabFromHistory(1)) {
     e.preventDefault();
     e.stopPropagation();
-    activateTabFromHistory(1);
     return;
   }
   if (isSwitchToPreviousTabShortcut(e, shortcuts)) {

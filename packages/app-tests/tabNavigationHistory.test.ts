@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import { test } from "vitest";
 import { createTabNavigationHistory, moveInTabNavigationHistory, recordTabVisit } from "../../apps/desktop/src/lib/tabs/tabNavigationHistory.ts";
 
-test("按实际查看顺序后退和前进", () => {
+test("navigates backward and forward in tab visit order", () => {
   let history = createTabNavigationHistory();
   history = recordTabVisit(history, "A");
   history = recordTabVisit(history, "D");
@@ -24,7 +24,7 @@ test("按实际查看顺序后退和前进", () => {
   assert.equal(moveInTabNavigationHistory(history, 1, openTabs)?.tabId, "B");
 });
 
-test("后退后手动查看标签会清除前进分支", () => {
+test("clears the forward branch after visiting a tab manually", () => {
   let history = createTabNavigationHistory();
   history = recordTabVisit(history, "A");
   history = recordTabVisit(history, "D");
@@ -37,7 +37,7 @@ test("后退后手动查看标签会清除前进分支", () => {
   assert.equal(moveInTabNavigationHistory(history, 1, new Set(["A", "B", "C", "D"])), null);
 });
 
-test("导航时跳过已经关闭的标签页", () => {
+test("skips closed tabs while navigating", () => {
   let history = createTabNavigationHistory();
   history = recordTabVisit(history, "A");
   history = recordTabVisit(history, "B");
@@ -49,7 +49,7 @@ test("导航时跳过已经关闭的标签页", () => {
   assert.equal(moveInTabNavigationHistory(backToA!.history, 1, openTabs)?.tabId, "C");
 });
 
-test("导航时跳过与当前标签相同的历史记录", () => {
+test("skips history entries matching the active tab", () => {
   let history = createTabNavigationHistory();
   history = recordTabVisit(history, "A");
   history = recordTabVisit(history, "D");

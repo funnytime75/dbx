@@ -101,6 +101,7 @@ const PLATFORM_DEFAULT_SHORTCUTS: Partial<Record<ShortcutActionId, ReadonlySet<s
   navigateTabHistoryForward: new Set(["Ctrl+Alt+ArrowRight", "Mod+Alt+ArrowRight"]),
 };
 const LEGACY_CLOSE_TAB_DEFAULT = "Meta+W";
+const TAB_NAVIGATION_HISTORY_ACTIONS: ShortcutActionId[] = ["navigateTabHistoryBack", "navigateTabHistoryForward"];
 
 export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   {
@@ -500,8 +501,20 @@ export function normalizeModifierOnlyShortcut(shortcut: string, fallback = ""): 
   return modifierOnlyShortcuts.has(normalized) ? normalized : fallback;
 }
 
+function hasExplicitShortcut(settings: Partial<ShortcutSettings> | undefined, actionId: ShortcutActionId): boolean {
+  return !!settings && Object.prototype.hasOwnProperty.call(settings, actionId) && typeof settings[actionId] === "string";
+}
+
+function shortcutsUseSameKeys(first: string, second: string, platform = globalThis.navigator?.platform || ""): boolean {
+  return !!first && !!second && formatShortcut(first, platform).toLowerCase() === formatShortcut(second, platform).toLowerCase();
+}
+
+export function needsTabNavigationHistoryShortcutMigration(settings?: Partial<ShortcutSettings>): boolean {
+  return !!settings && TAB_NAVIGATION_HISTORY_ACTIONS.some((actionId) => !hasExplicitShortcut(settings, actionId));
+}
+
 export function normalizeShortcutSettings(settings?: Partial<ShortcutSettings>): ShortcutSettings {
-  return Object.fromEntries(
+  const normalized = Object.fromEntries(
     SHORTCUT_DEFINITIONS.map((definition) => {
       const configuredValue = settings?.[definition.id];
       let configured = typeof configuredValue === "string" ? configuredValue : definition.defaultShortcut;
@@ -520,6 +533,17 @@ export function normalizeShortcutSettings(settings?: Partial<ShortcutSettings>):
       return [definition.id, normalized];
     }),
   ) as ShortcutSettings;
+
+  for (const actionId of TAB_NAVIGATION_HISTORY_ACTIONS) {
+    if (hasExplicitShortcut(settings, actionId)) continue;
+    const definition = SHORTCUT_DEFINITIONS.find((item) => item.id === actionId);
+    if (!definition) continue;
+    const defaultShortcut = normalized[actionId];
+    const occupiedByExistingAction = SHORTCUT_DEFINITIONS.some((item) => item.id !== actionId && item.scope === definition.scope && hasExplicitShortcut(settings, item.id) && shortcutsUseSameKeys(normalized[item.id], defaultShortcut));
+    if (occupiedByExistingAction) normalized[actionId] = "";
+  }
+
+  return normalized;
 }
 
 export function shortcutToCodeMirrorKey(shortcut: string): string {
