@@ -2,6 +2,7 @@ import { strict as assert } from "node:assert";
 import { afterAll, beforeAll, test, vi } from "vitest";
 import {
   eventToShortcut,
+  handleTabHistoryNavigationShortcut,
   isBrowserReloadShortcut,
   isCancelSearchShortcut,
   isCloseOtherTabsShortcut,
@@ -87,8 +88,17 @@ test("matches Shift+Mod+brackets for switching adjacent tabs", () => {
 test("navigates backward and forward through tab visit history with Ctrl+Alt+Arrow keys", () => {
   assert.equal(isNavigateTabHistoryBackShortcut({ key: "ArrowLeft", ctrlKey: true, altKey: true }), true);
   assert.equal(isNavigateTabHistoryForwardShortcut({ key: "ArrowRight", ctrlKey: true, altKey: true }), true);
+  assert.equal(isNavigateTabHistoryBackShortcut({ key: "ArrowLeft", ctrlKey: true, altKey: true }, undefined, "Win32"), true);
+  assert.equal(isNavigateTabHistoryBackShortcut({ key: "ArrowLeft", metaKey: true, altKey: true }, undefined, "Win32"), true);
   assert.equal(isNavigateTabHistoryBackShortcut({ key: "ArrowLeft", ctrlKey: true }), false);
   assert.equal(isNavigateTabHistoryForwardShortcut({ key: "ArrowRight", altKey: true }), false);
+});
+
+test("keeps Ctrl and Mod distinct for tab history shortcuts on macOS", () => {
+  const event = { key: "ArrowLeft", ctrlKey: true, altKey: true };
+
+  assert.equal(isNavigateTabHistoryBackShortcut(event, undefined, "MacIntel"), true);
+  assert.equal(isNavigateTabHistoryBackShortcut({ ...event, metaKey: true }, undefined, "MacIntel"), false);
 });
 
 test("matches tab history defaults to the recorded shortcut format on each platform", () => {
@@ -105,14 +115,15 @@ test("matches tab history defaults to the recorded shortcut format on each platf
   assert.equal(eventToShortcut(forwardEvent, "MacIntel"), tabNavigationHistoryDefaultShortcut("forward", "MacIntel"));
 });
 
-test("reports conflicts for recorded tab history shortcuts on Windows", () => {
+test("reports Ctrl and Mod as equivalent conflicts on Windows/Linux but not macOS", () => {
   const backShortcut = eventToShortcut({ key: "ArrowLeft", ctrlKey: true, altKey: true }, "Win32")!;
   const forwardShortcut = eventToShortcut({ key: "ArrowRight", ctrlKey: true, altKey: true }, "Win32")!;
-  const backSettings = { ...DEFAULT_SHORTCUT_SETTINGS, navigateTabHistoryBack: backShortcut, quickOpen: backShortcut };
-  const forwardSettings = { ...DEFAULT_SHORTCUT_SETTINGS, navigateTabHistoryForward: forwardShortcut, quickOpen: forwardShortcut };
+  const backSettings = { ...DEFAULT_SHORTCUT_SETTINGS, navigateTabHistoryBack: backShortcut, quickOpen: "Ctrl+Alt+ArrowLeft" };
+  const forwardSettings = { ...DEFAULT_SHORTCUT_SETTINGS, navigateTabHistoryForward: forwardShortcut, quickOpen: "Ctrl+Alt+ArrowRight" };
 
-  assert.equal(findShortcutConflict("quickOpen", backShortcut, backSettings), "navigateTabHistoryBack");
-  assert.equal(findShortcutConflict("quickOpen", forwardShortcut, forwardSettings), "navigateTabHistoryForward");
+  assert.equal(findShortcutConflict("quickOpen", backShortcut, backSettings, "Win32"), "navigateTabHistoryBack");
+  assert.equal(findShortcutConflict("quickOpen", forwardShortcut, forwardSettings, "Linux x86_64"), "navigateTabHistoryForward");
+  assert.equal(findShortcutConflict("quickOpen", "Mod+Alt+ArrowLeft", { ...DEFAULT_SHORTCUT_SETTINGS, navigateTabHistoryBack: "Ctrl+Alt+ArrowLeft", quickOpen: "Mod+Alt+ArrowLeft" }, "MacIntel"), null);
 });
 
 test("restores the local tab history default format after cross-platform sync", () => {
@@ -139,6 +150,44 @@ test("preserves existing actions and unbinds new history actions when defaults c
   assert.equal(normalized.switchToNextTab, "Mod+Alt+ArrowRight");
   assert.equal(normalized.navigateTabHistoryBack, "");
   assert.equal(normalized.navigateTabHistoryForward, "");
+});
+
+test("uses platform-aware defaults when migrating legacy shortcut settings", () => {
+  const windows = normalizeShortcutSettings({ switchToPreviousTab: "Ctrl+Alt+ArrowLeft" }, "Win32");
+  const mac = normalizeShortcutSettings({ switchToPreviousTab: "Mod+Alt+ArrowLeft" }, "MacIntel");
+
+  assert.equal(windows.navigateTabHistoryBack, "");
+  assert.equal(mac.navigateTabHistoryBack, "Ctrl+Alt+ArrowLeft");
+});
+
+test("only handles tab history shortcuts when navigation succeeds", () => {
+  const event = { key: "ArrowLeft", ctrlKey: true, altKey: true };
+  const directions: number[] = [];
+  let prevented = false;
+
+  prevented = handleTabHistoryNavigationShortcut(
+    event,
+    undefined,
+    (direction) => {
+      directions.push(direction);
+      return false;
+    },
+    "Win32",
+  );
+  assert.equal(prevented, false);
+  assert.deepEqual(directions, [-1]);
+
+  prevented = handleTabHistoryNavigationShortcut(
+    event,
+    undefined,
+    (direction) => {
+      directions.push(direction);
+      return true;
+    },
+    "Win32",
+  );
+  assert.equal(prevented, true);
+  assert.deepEqual(directions, [-1, -1]);
 });
 
 test("requests tab history migration only when legacy shortcut settings exist", () => {

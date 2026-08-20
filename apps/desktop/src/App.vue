@@ -72,8 +72,7 @@ import {
   isExecuteSqlShortcut,
   isFocusSearchShortcut,
   isModRShortcut,
-  isNavigateTabHistoryBackShortcut,
-  isNavigateTabHistoryForwardShortcut,
+  handleTabHistoryNavigationShortcut,
   isNewQueryShortcut,
   isObjectSourceSaveShortcutTarget,
   isOpenSettingsShortcut,
@@ -2295,12 +2294,7 @@ async function handleKeydown(e: KeyboardEvent) {
     }
     return;
   }
-  if (isNavigateTabHistoryBackShortcut(e, shortcuts) && activateTabFromHistory(-1)) {
-    e.preventDefault();
-    e.stopPropagation();
-    return;
-  }
-  if (isNavigateTabHistoryForwardShortcut(e, shortcuts) && activateTabFromHistory(1)) {
+  if (handleTabHistoryNavigationShortcut(e, shortcuts, activateTabFromHistory)) {
     e.preventDefault();
     e.stopPropagation();
     return;

@@ -509,20 +509,28 @@ function shortcutsUseSameKeys(first: string, second: string, platform = globalTh
   return !!first && !!second && formatShortcut(first, platform).toLowerCase() === formatShortcut(second, platform).toLowerCase();
 }
 
+function shortcutDefaultForPlatform(definition: ShortcutDefinition, platform: string): string {
+  if (definition.id === "closeOtherTabs") return closeOtherTabsDefaultShortcut(platform);
+  if (definition.id === "navigateTabHistoryBack") return tabNavigationHistoryDefaultShortcut("back", platform);
+  if (definition.id === "navigateTabHistoryForward") return tabNavigationHistoryDefaultShortcut("forward", platform);
+  return definition.defaultShortcut;
+}
+
 export function needsTabNavigationHistoryShortcutMigration(settings?: Partial<ShortcutSettings>): boolean {
   return !!settings && TAB_NAVIGATION_HISTORY_ACTIONS.some((actionId) => !hasExplicitShortcut(settings, actionId));
 }
 
-export function normalizeShortcutSettings(settings?: Partial<ShortcutSettings>): ShortcutSettings {
+export function normalizeShortcutSettings(settings?: Partial<ShortcutSettings>, platform = globalThis.navigator?.platform || ""): ShortcutSettings {
   const normalized = Object.fromEntries(
     SHORTCUT_DEFINITIONS.map((definition) => {
       const configuredValue = settings?.[definition.id];
-      let configured = typeof configuredValue === "string" ? configuredValue : definition.defaultShortcut;
+      const platformDefault = shortcutDefaultForPlatform(definition, platform);
+      let configured = typeof configuredValue === "string" ? configuredValue : platformDefault;
       // 云同步会把另一平台的默认值当作显式配置带过来。平台默认集合内的值视为
       // 未自定义，按本机平台重新解析；用户真正自定义的其他组合原样保留
       const platformDefaults = PLATFORM_DEFAULT_SHORTCUTS[definition.id];
       if (platformDefaults?.has(configured)) {
-        configured = definition.defaultShortcut;
+        configured = platformDefault;
       }
       // Meta+W was the old macOS-only default. Treat that exact value as a
       // legacy default so existing Windows/Linux settings adopt Ctrl+W.
@@ -539,7 +547,7 @@ export function normalizeShortcutSettings(settings?: Partial<ShortcutSettings>):
     const definition = SHORTCUT_DEFINITIONS.find((item) => item.id === actionId);
     if (!definition) continue;
     const defaultShortcut = normalized[actionId];
-    const occupiedByExistingAction = SHORTCUT_DEFINITIONS.some((item) => item.id !== actionId && item.scope === definition.scope && hasExplicitShortcut(settings, item.id) && shortcutsUseSameKeys(normalized[item.id], defaultShortcut));
+    const occupiedByExistingAction = SHORTCUT_DEFINITIONS.some((item) => item.id !== actionId && item.scope === definition.scope && hasExplicitShortcut(settings, item.id) && shortcutsUseSameKeys(normalized[item.id], defaultShortcut, platform));
     if (occupiedByExistingAction) normalized[actionId] = "";
   }
 
@@ -569,11 +577,11 @@ export function formatShortcut(shortcut: string, platform = globalThis.navigator
     .join("+");
 }
 
-export function findShortcutConflict(actionId: ShortcutActionId, shortcut: string, shortcuts: ShortcutSettings): ShortcutActionId | null {
+export function findShortcutConflict(actionId: ShortcutActionId, shortcut: string, shortcuts: ShortcutSettings, platform = globalThis.navigator?.platform || ""): ShortcutActionId | null {
   if (!shortcut) return null;
   const definition = SHORTCUT_DEFINITIONS.find((item) => item.id === actionId);
   if (!definition) return null;
 
-  const conflict = SHORTCUT_DEFINITIONS.find((item) => item.id !== actionId && item.scope === definition.scope && shortcuts[item.id] === shortcut);
+  const conflict = SHORTCUT_DEFINITIONS.find((item) => item.id !== actionId && item.scope === definition.scope && shortcutsUseSameKeys(shortcuts[item.id], shortcut, platform));
   return conflict?.id ?? null;
 }
